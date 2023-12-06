@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script src="struct_framework.js"></script>
+    <script>
+      // Nested srtuct
+      registerStruct("sub", {
+        l: "long",
+        ch: "char",
+      });
+
+      // register struct type, and record size
+      registerStruct("struct", {
+        a: "int",
+        b: "int",
+        c: "float",
+        s: "sub",
+      });
+
+      var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+
+      var exports;
+      WebAssembly.instantiateStreaming(fetch("nested_struct.wasm"), {
+        js: {
+          mem: memory,
+        },
+      }).then((results) => {
+        exports = results.instance.exports;
+        memory = results.instance.exports.memory;
+      });
+
+      function run_wasm() {
+        const a = document.querySelector("#a").value;
+        const b = document.querySelector("#b").value;
+        const c = document.querySelector("#c").value;
+
+        let ptr = exports.createStruct(a, b, c, BigInt("678678678678"), "8".charCodeAt(0));
+        // Decoding
+        const obj = startDecodeStruct("struct", ptr, memory);
+        console.log("Decoded Object", obj);
+        exports.wasmfree(ptr);
+
+        const memoryArray = new Uint8Array(memory.buffer);
+        memoryArray.fill(0);
+
+        // Encoding
+        ptr = startEncodeStruct(
+          "struct",
+          {
+            a: a,
+            b: b,
+            c: c,
+            sub: {
+              l: BigInt("123987123"),
+              ch: "A",
+            },
+          },
+          memory,
+          exports.wasmmalloc
+        );
+        var sum = exports.computeSum(ptr);
+        var bigint = exports.getBigInt(ptr);
+        var char = exports.getChar(ptr);
+        console.log("Sum:", sum);
+        console.log("BigInt", bigint);
+        console.log("char", char);
+        exports.wasmfree(ptr);
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <input type="number" id="b" />
+    <input type="number" id="c" />
+    <button onclick="run_wasm()">Compute Sum</button>
+  </body>
+</html>

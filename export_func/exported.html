@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <script src="library.js"></script>
+    <style>
+      #progress {
+        height: 30px;
+        width: 0px;
+        display: block;
+        background-color: navy;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+
+      var exports;
+      WebAssembly.instantiateStreaming(fetch("exported.wasm"), {
+        js: {
+          mem: memory,
+        },
+        // export js library to WASM instance
+        env: {
+          curTime: curTime,
+          logProgress: logProgress,
+        },
+      }).then((results) => {
+        exports = results.instance.exports;
+        memory = results.instance.exports.memory;
+      });
+
+      function get_string() {
+        var str = decodeString(exports.randomString(40));
+        console.log(str);
+        navigator.clipboard.writeText(str);
+
+        //
+        document.querySelector("#ret").innerHTML += `${str}<br/>`;
+      }
+
+      /**
+       * Decodes array
+       * @param: ptr pointer
+       * @param: len length
+       * @return: Uint8Array
+       */
+      function decodeArray(ptr, len) {
+        return new Uint8Array(memory.buffer).slice(ptr, ptr + len);
+      }
+
+      /**
+       * Decode a string of fixed length
+       * @param: ptr pointer
+       * @param: len length
+       * @return: String
+       */
+      function decodeString(ptr, len) {
+        return new TextDecoder("utf8").decode(decodeArray(ptr, len));
+      }
+
+      /**
+       * Decode a string of unknown length
+       * @param: ptr pointer
+       * @param: len length
+       * @return: Uint8Array
+       */
+      function decodeString(ptr) {
+        var bytes = new Uint8Array(memory.buffer, ptr);
+
+        var strlen = 0;
+        while (bytes[strlen] != 0) strlen++;
+
+        return new TextDecoder("utf8").decode(bytes.slice(0, strlen));
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <button onclick="get_string()">Copy string</button>
+    <div id="progress"></div>
+    <p id="ret"></p>
+  </body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script>
+      var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+
+      var exports;
+      WebAssembly.instantiateStreaming(fetch("malloc.wasm"), {
+        js: {
+          mem: memory,
+        },
+        // I think WASM was updated to not need this anymore
+        //   // Define callback to allow js to call c# library function
+        //   env: {
+        //     // allows increasig the memory pointer size
+        //     emscripten_resize_heap: function (delta) {
+        //       memory.grow(delta);
+        //     },
+        //   },
+      }).then((results) => {
+        exports = results.instance.exports;
+        memory = results.instance.exports.memory;
+      });
+
+      function run_wasm() {
+        // // Use Malloc pointer
+        // // 4 bytes per int
+        // const intBytes = 4;
+        // // 10 integers
+        // const numIntegers = 10;
+        // var ptr = exports.wasmmalloc(intBytes * numIntegers);
+        // console.log("pointer memory index", ptr);
+        // // Offset by pointer
+        // var arr = new Uint32Array(memory.buffer, ptr);
+        // for (var i = 0; i < numIntegers; i++) {
+        //   arr[i] = i * 2;
+        // }
+
+        // Using Malloc Pointer
+        // with Encode Array to replace loop
+        var arr = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+        const intBytes = 4;
+        const arrayLength = 11;
+        var ptr = encodeArray(arr, arrayLength, intBytes);
+
+        // instead of passing 0, pass in pointer
+        var sum = exports.accumulate(ptr, arrayLength);
+
+        // Clean up our memory. Free pointer
+        exports.wasmfree(ptr);
+
+        document.querySelector("#ret").innerHTML += `${sum}<br/>`;
+      }
+
+      function get_string() {
+        var str = decodeString(exports.getString());
+        console.log(str);
+        navigator.clipboard.writeText(str);
+      }
+
+      /**
+       * Translates memory from javascript, then pass it to the buffer
+       * @param arr: array to be decoded
+       * @param len: length of array
+       * @param sizeof: bytes size of integer
+       * return: pointer
+       */
+      function encodeArray(arr, len, sizeof = 1) {
+        var ptr;
+        var out;
+
+        // Place Pointer
+        // 8 Byte integers -- Uint64 / Bigint
+        if (sizeof == 8) {
+          ptr = exports.wasmmalloc(len * 8);
+          out = new BigUint64Array(memory.buffer, ptr);
+        }
+        // 4 Byte integers -- Uint32
+        else if (sizeof == 4) {
+          ptr = exports.wasmmalloc(len * 4);
+          out = new Uint32Array(memory.buffer, ptr);
+        }
+        // 1 Byte integers -- Uint8 / tinyint
+        else {
+          ptr = exports.wasmmalloc(len);
+          out = new Uint8Array(memory.buffer, ptr);
+        }
+
+        // Copy elements into array
+        for (var i = 0; i < len; i++) {
+          out[i] = arr[i];
+        }
+
+        return ptr;
+      }
+
+      /**
+       * Decodes array
+       * @param: ptr pointer
+       * @param: len length
+       * @return: Uint8Array
+       */
+      function decodeArray(ptr, len) {
+        return new Uint8Array(memory.buffer).slice(ptr, ptr + len);
+      }
+
+      /**
+       * Decode a string of fixed length
+       * @param: ptr pointer
+       * @param: len length
+       * @return: String
+       */
+      function decodeString(ptr, len) {
+        return new TextDecoder("utf8").decode(decodeArray(ptr, len));
+      }
+
+      /**
+       * Decode a string of unknown length
+       * @param: ptr pointer
+       * @param: len length
+       * @return: Uint8Array
+       */
+      function decodeString(ptr) {
+        // get the memory
+        var bytes = new Uint8Array(memory.buffer, ptr);
+
+        // find our str len
+        var strlen = 0;
+        while (bytes[strlen] != 0) strlen++;
+
+        // decode the value
+        return new TextDecoder("utf8").decode(
+          bytes
+            // we are already offset by pointer, so use 0
+            .slice(0, strlen)
+        );
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <button onclick="run_wasm()">Trigger</button>
+    <button onclick="get_string()">Copy string</button>
+    <p id="ret"></p>
+  </body>
+</html>

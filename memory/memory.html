@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script>
+      // setup memory block
+      var memory = new WebAssembly.Memory(
+        // Descriptor
+        { initial: 256, maximum: 512 }
+      );
+
+      var exports;
+      WebAssembly.instantiateStreaming(
+        fetch("memory.wasm"),
+        // Pass in Memory object here
+        {
+          js: {
+            mem: memory,
+          },
+        }
+      ).then((results) => {
+        exports = results.instance.exports;
+        // sync pointer during stream
+        memory = results.instance.exports.memory;
+      });
+
+      function run_wasm() {
+        // initilize array with buffer
+        var arr = new Uint32Array(memory.buffer);
+        for (var i = 0; i < 10; i++) {
+          arr[i] = i * 2;
+        }
+
+        // 0 acts as the pointer -- beginning of array
+        var sum = exports.accumulate(0, 10);
+
+        document.querySelector("#ret").innerHTML += `${sum}<br/>`;
+      }
+
+      function get_string() {
+        // Get c pointer function
+        var ptr = exports.getString();
+        // Get our memory, and offset it by the pointer
+        var bytes = new Uint8Array(memory.buffer, ptr);
+
+        // Programaticaly determine our string length
+        var strlen = 0;
+        while (bytes[strlen] != 0) strlen++;
+
+        //decode our value
+        var str = new TextDecoder("utf8").decode(bytes.slice(0, strlen));
+        console.log(str);
+        // Copy to clipboard
+        navigator.clipboard.writeText(str);
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <button onclick="run_wasm()">Trigger</button>
+    <button onclick="get_string()">Copy string</button>
+    <p id="ret"></p>
+  </body>
+</html>

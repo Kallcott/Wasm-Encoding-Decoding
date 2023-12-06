@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script src="struct_framework.js"></script>
+    <script>
+      var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+
+      var exports;
+      WebAssembly.instantiateStreaming(fetch("num_struct.wasm"), {
+        js: {
+          mem: memory,
+        },
+      }).then((results) => {
+        exports = results.instance.exports;
+        memory = results.instance.exports.memory;
+      });
+
+      function run_wasm() {
+        const a = document.querySelector("#a").value;
+        const b = document.querySelector("#b").value;
+        const c = document.querySelector("#c").value;
+
+        //Building our C Struct
+
+        // Allocate space in memory
+        const elementByteSize = 4;
+        const arraySize = 3;
+        var ptr = exports.wasmmalloc(elementByteSize * arraySize);
+
+        // Setup Ints
+        const intArrSize = 2;
+        var buf = new Uint32Array(memory.buffer, ptr, intArrSize);
+        buf[0] = a; // int
+        buf[1] = b; // int
+        console.log("int buffer", buf);
+
+        // Setup Floats
+        const floatArrSize = 1;
+        var buf = new Float32Array(
+          memory.buffer,
+          // offset our pointer by our previous space
+          ptr + intArrSize * elementByteSize,
+          floatArrSize
+        );
+        buf[0] = c; // float
+        console.log("float buffer", buf);
+
+        // Passing in args
+        var sum = exports.computeSum(ptr);
+        console.log(sum);
+
+        exports.wasmfree(ptr);
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <input type="number" id="b" />
+    <input type="number" id="c" />
+    <button onclick="run_wasm()">Compute Sum</button>
+  </body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script src="struct_framework.js"></script>
+    <script>
+      // register struct type, and record size
+      registerStruct("struct", {
+        a: "int",
+        b: "int",
+        c: "float",
+      });
+
+      var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+
+      var exports;
+      WebAssembly.instantiateStreaming(fetch("num_struct.wasm"), {
+        js: {
+          mem: memory,
+        },
+      }).then((results) => {
+        exports = results.instance.exports;
+        memory = results.instance.exports.memory;
+      });
+
+      function run_wasm() {
+        const a = document.querySelector("#a").value;
+        const b = document.querySelector("#b").value;
+        const c = document.querySelector("#c").value;
+
+        console.log("encoding");
+        //Building our C Struct
+        var ptr = startEncodeStruct(
+          // Name of struct
+          "struct",
+          // Real Values
+          {
+            a: a,
+            b: b,
+            c: c,
+          },
+          // Memory to write to
+          memory,
+          // Callback to use malloc
+          exports.wasmmalloc
+        );
+
+        // Passing in args
+        var sum = exports.computeSum(ptr);
+        console.log(sum);
+
+        exports.wasmfree(ptr);
+
+        // Decoding
+        var ptr = exports.createPair(a, b, c);
+        var object = startDecodeStruct("struct", ptr, memory);
+        console.log(object);
+        sum = exports.computeSum(ptr);
+        console.log(sum);
+        exports.wasmfree(ptr);
+      }
+    </script>
+
+    <input type="number" id="a" />
+    <input type="number" id="b" />
+    <input type="number" id="c" />
+    <button onclick="run_wasm()">Compute Sum</button>
+  </body>
+</html>
