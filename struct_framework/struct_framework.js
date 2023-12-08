@@ -49,7 +49,7 @@ function computeStructureSize(structFormat) {
  * @param {*} buffer
  * @param {*} offset
  */
-function encodeNum(num, n, type, buffer, offset = 0) {
+function encodePrimitive(num, n, type, buffer, offset = 0) {
   // First 8 bits are written first in small endian
   if (type === "int") {
     for (var i = 0; i < n; i++) {
@@ -93,7 +93,7 @@ function encodeStruct(structName, obj, buffer, offset = 0) {
   for (const [key, type] of Object.entries(structs[structName])) {
     if (primitives.includes(type)) {
       // console.log("setting", obj[key] ?? 0, "for", key, "as", type, "at", cursor);
-      encodeNum(
+      encodePrimitive(
         // If struct doesn't match it is undefined.
         obj[key] ?? 0,
         // number of bytes
@@ -144,7 +144,7 @@ function startEncodeStruct(structName, obj, memory, malloc) {
  * @param {*} offset
  * @returns value of the type
  */
-function decodeNum(n, type, buffer, offset = 0) {
+function decodePrimitive(n, type, buffer, offset = 0) {
   let ret = 0;
 
   //small endian
@@ -189,7 +189,7 @@ function decodeStruct(structName, buffer, offset = 0) {
   for (const [key, type] of Object.entries(structs[structName])) {
     // console.log("decoding", buffer.subarray(cursor, cursor + types[type]), "for", key, "as", type, "at", cursor);
     if (primitives.includes(type)) {
-      ret[key] = decodeNum(types[type], type, buffer, cursor);
+      ret[key] = decodePrimitive(types[type], type, buffer, cursor);
     } else {
       // Recursively Decode. now requires offset
       ret[key] = decodeStruct(type, buffer, cursor);
