@@ -20,8 +20,34 @@
         b: "int",
         c: "float",
         s: "sub",
-        ptr: "int*",
+        ptr: "int**",
+        int_arr: "int[]",
+        arr_length: "int",
+        name: "char*",
       });
+
+      // Extern function
+      function printName(ptr) {
+        const str = decodeString(ptr);
+        console.log("found name", str, "at", ptr);
+      }
+
+      // Decodes a string
+      function decodeString(ptr) {
+        // get the memory
+        var bytes = new Uint8Array(memory.buffer, ptr);
+
+        // find our str len
+        var strlen = 0;
+        while (bytes[strlen] != 0) strlen++;
+
+        // decode the value
+        return new TextDecoder("utf8").decode(
+          bytes
+            // we are already offset by pointer, so use 0
+            .slice(0, strlen)
+        );
+      }
 
       var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
 
@@ -29,6 +55,13 @@
       WebAssembly.instantiateStreaming(fetch("align_pointers.wasm"), {
         js: {
           mem: memory,
+        },
+        env: {
+          // allows increasig the memory pointer size
+          emscripten_resize_heap: function (delta) {
+            memory.grow(delta);
+          },
+          printNameToConsole: printName,
         },
       }).then((results) => {
         exports = results.instance.exports;
@@ -50,6 +83,8 @@
         // memoryArray.fill(0);
 
         // Encoding
+
+        const array = [5, 2, 0, 15, -2];
         ptr = encodePointer(
           "struct",
           {
@@ -61,16 +96,30 @@
               ch: "A",
             },
             ptr: 15,
+            int_arr: array,
+            arr_length: array.length,
+            name: "WebAssembly",
           },
           memory,
           exports.wasmmalloc
         );
-        console.log("Charcode", "A".charCodeAt(0));
+        // console.log("Charcode", "A".charCodeAt(0));
+        // console.log("Sum:", exports.computeSum(ptr));
 
-        console.log("Sum:", exports.computeSum(ptr));
-        console.log("BigInt", exports.getBigInt(ptr));
-        console.log("char", exports.getChar(ptr));
-        console.log("int pointer is", exports.getPtr(ptr));
+        // Data Type Logs
+        // console.log("BigInt", exports.getBigInt(ptr));
+        // console.log("char", exports.getChar(ptr));
+
+        // Pointer Logs
+        // console.log("int pointer is", exports.getPtr(ptr));
+
+        // Array Logs
+        console.log("Terminator Based sum is", exports.compSumTerminator(ptr));
+        console.log("Size sum is", exports.compSumSize(ptr));
+
+        console.log("getting name");
+        exports.printName(ptr);
+
         exports.wasmfree(ptr);
       }
     </script>

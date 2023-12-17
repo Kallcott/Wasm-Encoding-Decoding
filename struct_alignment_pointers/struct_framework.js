@@ -26,6 +26,19 @@ function registerStruct(name, structFormat) {
 }
 
 /**
+ * Gets the size of the element
+ * @param {string} type a registered Type
+ * @returns number size
+ */
+function getElemSize(type) {
+  if (type.endsWith("*") || type.endsWith("[]")) {
+    return 4;
+  } else {
+    return types[type];
+  }
+}
+
+/**
  * computes the size of all the types in our struct format.
  * @param {*} structFormat
  * @returns int, byte size of struct
@@ -35,11 +48,7 @@ function computeStructureSize(structFormat) {
 
   for (const type of Object.values(structFormat)) {
     // Special case for pointer
-    if (type.endsWith("*")) {
-      size += 4;
-    } else {
-      size += types[type];
-    }
+    size += getElemSize(type);
   }
 
   return size;
@@ -117,7 +126,7 @@ function encodeStruct(type, obj, buffer, memory, malloc, cursor = 0, pointer = 0
   for (const [name, elemType] of Object.entries(structs[type])) {
     encodeElem(elemType, obj[name], buffer, memory, malloc, cursor, pointer);
 
-    cursor += types[elemType];
+    cursor += getElemSize(elemType);
   }
 }
 
@@ -131,8 +140,15 @@ function encodeStruct(type, obj, buffer, memory, malloc, cursor = 0, pointer = 0
 function encodeElem(type, obj, buffer, memory, malloc, cursor = 0, pointer = 0) {
   console.log("encoding", obj, type, "at", pointer, "offset by", cursor);
   if (type.endsWith("*")) {
-    // pointer
+    // Chop 1 off to remove "*"
     const ptr = encodePointer(type.substring(0, type.length - 1), obj, memory, malloc);
+    console.log("setting", ptr, "at", cursor);
+    // Our pointer is stored as an int
+    encodeInt(ptr, 4, buffer, cursor);
+  } else if (type.endsWith("[]")) {
+    // Chop 2 off to remove "[]"
+    const ptr = encodeArray(type.substring(0, type.length - 2), obj, memory, malloc);
+    console.log("setting", ptr, "at", cursor);
     encodeInt(ptr, 4, buffer, cursor);
   } else if (primitives.includes(type)) {
     switch (type) {
@@ -149,25 +165,78 @@ function encodeElem(type, obj, buffer, memory, malloc, cursor = 0, pointer = 0) 
         encodeChar(obj, memory, pointer, cursor);
         break;
     }
-    console.log(buffer);
   } else {
     // Recusive
     encodeStruct(type, obj, buffer, memory, malloc, cursor, pointer);
   }
 }
 
-//Entry function
+/**
+ * Loads the pointer range into a buffer, then sends to wasm
+ * @param {*} type
+ * @param {*} obj
+ * @param {*} memory
+ * @param {*} malloc
+ * @returns
+ */
 function encodePointer(type, obj, memory, malloc) {
   if (!obj) {
     return 0; // NULL
   }
   // Create pointer
-  var ptr = malloc(types[type]);
-  const buf = new Uint8Array(memory.buffer, ptr, types[type]);
-  console.log("allocated", types[type], "at", ptr, "for", type);
+  const n = getElemSize(type);
+  const ptr = malloc(n);
+  const buf = new Uint8Array(memory.buffer, ptr, n);
+  console.log("allocated", n, "at", ptr, "for", type);
 
   encodeElem(type, obj, buf, memory, malloc, 0, ptr);
-  console.log(buf);
+  return ptr;
+}
+
+/**
+ * Encodes an Array.
+ * - Includes a terminator element. Will be 0, or array length
+ * @param {*} type
+ * @param {*} obj
+ * @param {*} memory
+ * @param {*} malloc
+ * @returns
+ */
+function encodeArray(type, obj, memory, malloc) {
+  if (!obj) {
+    return 0; // NULL
+  }
+
+  // Only worrying about int array right now
+  // - so we are assuming data size is constant
+  // Add + 1 Terminating array with a padding of 0, or a Array Length
+  const n = type === getElemSize(type);
+  const nTotal = (obj.length + 1) * n;
+  const ptr = malloc(nTotal);
+  const buf = new Uint8Array(memory.buffer, ptr, nTotal);
+
+  if (type === "char") {
+    // Special Case for Strings
+
+    for (i = 0; i < obj.length; i++) {
+      // Asign Object to buffer
+      buf[i] = obj[i];
+    }
+    // add empt
+    buf[obj.length] = 0;
+  } else {
+    // Int
+
+    let cursor = 0;
+    for (var i = 0; i < obj.length; i++) {
+      // Int
+      encodeElem(type, obj[i], buf, memory, malloc, cursor, ptr);
+      cursor += n;
+    }
+    // Encoding Terminator Element of 0
+    encodeInt(0, n, buf, cursor);
+  }
+
   return ptr;
 }
 
