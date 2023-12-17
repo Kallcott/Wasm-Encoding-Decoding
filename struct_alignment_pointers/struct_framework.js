@@ -56,45 +56,6 @@ function computeStructureSize(structFormat) {
 
 //#region Encode
 
-// /**
-//  * Encodes the number into binary, and assigns it into the buffer
-//  * @param {*} num value
-//  * @param {*} n bytes size
-//  * @param {*} buffer
-//  * @param {*} offset
-//  */
-// function encodePrimitive(num, n, type, buffer, offset = 0) {
-//   // First 8 bits are written first in small endian
-//   if (type === "int") {
-//     for (var i = 0; i < n; i++) {
-//       // Assign 8 bits.
-//       // Note the UInt8 array will chop off larger values
-//       buffer[i + offset] = num;
-//       // shift by size of array
-//       num >>= 8;
-//     }
-//   } else if (type === "long") {
-//     for (let i = 0; i < n; i++) {
-//       buffer[i + offset] = Number(num);
-//       num >>= 8n;
-//     }
-//   } else if (type === "float") {
-//     // Get value as IEEE 754, small endian
-//     const float32Array = new Float32Array([num]);
-//     // Convert to bytes
-//     const bytes = new Uint8Array(float32Array.buffer);
-
-//     // Assign bytes to our buffer
-//     for (var i = 0; i < n; i++) {
-//       buffer[i + offset] = bytes[i];
-//       num >>= 8;
-//     }
-//   } else if (type === "char") {
-//     const charcode = String(num).charCodeAt(0);
-//     buffer[offset] = charcode;
-//   }
-// }
-
 function encodeInt(num, n, buffer, offset = 0) {
   for (let i = 0; i < n; i++) {
     buffer[i + offset] = num;
@@ -210,20 +171,23 @@ function encodeArray(type, obj, memory, malloc) {
   // Only worrying about int array right now
   // - so we are assuming data size is constant
   // Add + 1 Terminating array with a padding of 0, or a Array Length
-  const n = type === getElemSize(type);
+  const n = getElemSize(type);
   const nTotal = (obj.length + 1) * n;
   const ptr = malloc(nTotal);
   const buf = new Uint8Array(memory.buffer, ptr, nTotal);
 
   if (type === "char") {
     // Special Case for Strings
+    console.log("setting string", obj, obj.length, n, nTotal);
 
     for (i = 0; i < obj.length; i++) {
       // Asign Object to buffer
-      buf[i] = obj[i];
+      console.log(obj[i]);
+      buf[i] = obj[i].charCodeAt(0);
     }
     // add empt
     buf[obj.length] = 0;
+    console.log(buf);
   } else {
     // Int
 

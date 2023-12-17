@@ -26,19 +26,19 @@ typedef struct
     char *name;
 } __attribute__((packed)) s;
 
-EMSCRIPTEN_KEEPALIVE
-s *createStruct(int a, int b, float c, uint64_t l, char ch)
-{
-    s *newstruct = malloc(sizeof(s));
-    newstruct->a = a;
-    newstruct->b = b;
-    newstruct->c = c;
-    newstruct->structure.l = l;
-    newstruct->structure.ch = ch;
+// EMSCRIPTEN_KEEPALIVE
+// s *createStruct(int a, int b, float c, uint64_t l, char ch)
+// {
+//     s *newstruct = malloc(sizeof(s));
+//     newstruct->a = a;
+//     newstruct->b = b;
+//     newstruct->c = c;
+//     newstruct->structure.l = l;
+//     newstruct->structure.ch = ch;
 
-    return newstruct;
-    ;
-}
+//     return newstruct;
+//     ;
+// }
 
 EMSCRIPTEN_KEEPALIVE
 float computeSum(s *obj)

@@ -6,6 +6,7 @@
     <title>Document</title>
   </head>
   <body>
+    <script src="library.js"></script>
     <script src="struct_framework.js"></script>
     <script>
       // Nested srtuct
@@ -23,31 +24,8 @@
         ptr: "int**",
         int_arr: "int[]",
         arr_length: "int",
-        name: "char*",
+        name: "char[]",
       });
-
-      // Extern function
-      function printName(ptr) {
-        const str = decodeString(ptr);
-        console.log("found name", str, "at", ptr);
-      }
-
-      // Decodes a string
-      function decodeString(ptr) {
-        // get the memory
-        var bytes = new Uint8Array(memory.buffer, ptr);
-
-        // find our str len
-        var strlen = 0;
-        while (bytes[strlen] != 0) strlen++;
-
-        // decode the value
-        return new TextDecoder("utf8").decode(
-          bytes
-            // we are already offset by pointer, so use 0
-            .slice(0, strlen)
-        );
-      }
 
       var memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
 
@@ -57,10 +35,6 @@
           mem: memory,
         },
         env: {
-          // allows increasig the memory pointer size
-          emscripten_resize_heap: function (delta) {
-            memory.grow(delta);
-          },
           printNameToConsole: printName,
         },
       }).then((results) => {
@@ -73,17 +47,7 @@
         const b = document.querySelector("#b").value;
         const c = document.querySelector("#c").value;
 
-        // let ptr = exports.createStruct(a, b, c, BigInt("678678678678"), "8".charCodeAt(0));
-        // // Decoding
-        // const obj = startDecodeStruct("struct", ptr, memory);
-        // console.log("Decoded Object", obj);
-        // exports.wasmfree(ptr);
-
-        // const memoryArray = new Uint8Array(memory.buffer);
-        // memoryArray.fill(0);
-
         // Encoding
-
         const array = [5, 2, 0, 15, -2];
         ptr = encodePointer(
           "struct",
@@ -117,8 +81,14 @@
         console.log("Terminator Based sum is", exports.compSumTerminator(ptr));
         console.log("Size sum is", exports.compSumSize(ptr));
 
+        // String Logs
         console.log("getting name");
         exports.printName(ptr);
+        // let test = new Uint8Array(memory.buffer, ptr, 12);
+        // console.log(test);
+        // test.forEach((element) => {
+        //   console.log(String.fromCharCode(element));
+        // });
 
         exports.wasmfree(ptr);
       }
